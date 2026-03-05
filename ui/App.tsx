@@ -442,7 +442,6 @@ function OperationPage({ config }: { config: OperationPageConfig }) {
     const { outputDir, setOutputDir, selectOutputDir } = useOutputDir();
     const [options, setOptions] = useState<Record<string, any>>({});
 
-    // Always set output dir to first file's directory
     useEffect(() => {
         setOutputDir(files.length > 0 ? getDirectory(files[0]) : '');
     }, [files]);
@@ -779,7 +778,7 @@ function CreatePage() {
     );
 }
 
-function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
+function SettingsPage({ onBackendChanged, isWindows }: { onBackendChanged?: () => void; isWindows: boolean }) {
     const [backendVersion, setBackendVersion] = useState<string | null>(null);
     const [keysInstalled, setKeysInstalled] = useState(false);
     const [updateStatus, setUpdateStatus] = useState<string | null>(null);
@@ -795,8 +794,9 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
         setUpdateStatus(null);
         try {
             const release = await api.fetchLatestRelease();
+
             if (!release) {
-                setUpdateStatus('Could not reach GitHub. Check your network connection.');
+                setUpdateStatus('No compatible backend asset found for your OS in the latest GitHub release. Please import manually.');
             } else if (backendVersion && release.tag === backendVersion) {
                 setUpdateStatus(`Already up to date (${backendVersion})`);
             } else {
@@ -831,6 +831,8 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
         if (result.ok) setKeysInstalled(true);
     };
 
+    const backendLabel = isWindows ? 'nscb_rust.exe' : 'nscb_rust';
+
     return (
         <div className="page">
             <div className="page-header">
@@ -847,7 +849,7 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
 
                     <div className="settings-row">
                         <div className="settings-row-label">
-                            <h4>Backend Binary (nscb_rust.exe)</h4>
+                            <h4>Backend Binary ({backendLabel})</h4>
                             <p>{backendVersion ? `Installed: ${backendVersion}` : 'Unknown version (manually imported)'}</p>
                         </div>
                         <div className="settings-row-control">
@@ -955,11 +957,13 @@ function SetupPage({
     );
 }
 
-function MissingBackendBanner({ onGoToSettings }: { onGoToSettings: () => void }) {
+function MissingBackendBanner({ onGoToSettings, isWindows }: { onGoToSettings: () => void; isWindows: boolean }) {
+    const backendLabel = isWindows ? 'nscb_rust.exe' : 'nscb_rust';
+
     return (
         <div className="missing-backend-banner">
             {Icons.alertCircle}
-            <span><strong>nscb_rust.exe</strong> is missing. Go to Settings &gt; Tools to download or import it.</span>
+            <span><strong>{backendLabel}</strong> is missing. Go to Settings &gt; Tools to download or import it.</span>
             <button className="btn btn-secondary btn-sm" onClick={onGoToSettings}>
                 Open Settings
             </button>
@@ -997,11 +1001,17 @@ export default function App() {
     const [hasBackendState, setHasBackend] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    const [isWindows, setIsWindows] = useState(true);
+
     function applySetupState(state: { dir: string | null; keys: boolean; backend: boolean }) {
         setToolsDir(state.dir);
         setHasKeys(state.keys);
         setHasBackend(state.backend);
     }
+
+    useEffect(() => {
+        api.getPlatform().then(p => setIsWindows(p === 'windows')).catch(() => setIsWindows(true));
+    }, []);
 
     useEffect(() => {
         (async () => {
@@ -1063,7 +1073,10 @@ export default function App() {
             <Sidebar activePage={activePage} onNavigate={setActivePage} />
             <main className="main-content">
                 {!hasBackendState && (
-                    <MissingBackendBanner onGoToSettings={() => setActivePage('settings')} />
+                    <MissingBackendBanner
+                        isWindows={isWindows}
+                        onGoToSettings={() => setActivePage('settings')}
+                    />
                 )}
                 {Object.entries(PAGES).map(([id, PageComponent]) => (
                     <div key={id} style={{ display: activePage === id ? 'block' : 'none' }}>
@@ -1071,7 +1084,7 @@ export default function App() {
                     </div>
                 ))}
                 <div style={{ display: activePage === 'settings' ? 'block' : 'none' }}>
-                    <SettingsPage onBackendChanged={refreshBackendState} />
+                    <SettingsPage isWindows={isWindows} onBackendChanged={refreshBackendState} />
                 </div>
             </main>
             <ToastContainer toasts={toasts} />
