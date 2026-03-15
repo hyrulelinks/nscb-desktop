@@ -24,6 +24,7 @@ const Icons = {
     split: icon(20, <><path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" /></>),
     dspl: icon(20, <><path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" /><circle cx="18" cy="18" r="3" /></>),
     create: icon(20, <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>),
+    rename: icon(20, <><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></>),
     settings: icon(20, <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></>),
     upload: icon(40, <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>, 1.5),
     file: icon(16, <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></>),
@@ -170,6 +171,7 @@ const NAV_PAGES = [
     { id: 'dspl', icon: Icons.dspl, label: 'Split to Files' },
     { id: 'create', icon: Icons.create, label: 'Create/Repack' },
     { id: 'info', icon: Icons.info, label: 'Info' },
+    { id: 'rename', icon: Icons.rename, label: 'Rename' },
     { id: 'settings', icon: Icons.settings, label: 'Settings' },
 ];
 
@@ -882,6 +884,170 @@ function InfoPage() {
     );
 }
 
+function RenamePage() {
+    const { files, addFiles, removeFile, clearFiles } = useFileList();
+    const { running, progress, outputLines, setRunning, setProgress, setOutputLines } = useRunnerEvents(['renamef', 'nutdb-refresh', 'nutdb-lookup']);
+    const [renmode, setRenmode] = useState('force');
+    const [addlangue, setAddlangue] = useState('false');
+    const [noversion, setNoversion] = useState('false');
+    const [dlcrname, setDlcrname] = useState('false');
+    const [nutdbTitleId, setNutdbTitleId] = useState('');
+
+    const handleStart = async () => {
+        if (files.length === 0) return;
+        setRunning(true);
+        setProgress({ ...EMPTY_PROGRESS, message: 'Renaming files...' });
+        setOutputLines([]);
+        await runner.run('renamef', files, {
+            renmode,
+            addlangue,
+            noversion,
+            dlcrname,
+        });
+    };
+
+    const handleNutdbRefresh = async () => {
+        setRunning(true);
+        setProgress({ ...EMPTY_PROGRESS, message: 'Refreshing NUTDB cache...' });
+        setOutputLines([]);
+        await runner.run('nutdb-refresh', [], {});
+    };
+
+    const handleNutdbLookup = async () => {
+        if (!nutdbTitleId.trim()) return;
+        setRunning(true);
+        setProgress({ ...EMPTY_PROGRESS, message: `Looking up ${nutdbTitleId}...` });
+        setOutputLines([]);
+        await runner.run('nutdb-lookup', [], { titleId: nutdbTitleId.trim() });
+    };
+
+    const handleCancel = async () => {
+        await runner.cancel();
+        setRunning(false);
+        setProgress({ ...EMPTY_PROGRESS, message: 'Cancelled' });
+    };
+
+    const handleClear = () => {
+        clearFiles();
+        setOutputLines([]);
+        setProgress(EMPTY_PROGRESS);
+    };
+
+    return (
+        <div className="page">
+            <div className="page-header">
+                <div className="page-icon accent-rename">{Icons.rename}</div>
+                <div>
+                    <h2>Rename</h2>
+                    <p>Rename Switch files using metadata and NUTDB lookup</p>
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">Input Files / Folders</span>
+                </div>
+                <div style={{ padding: '12px' }}>
+                    <DropZone onFiles={addFiles} accept={['nsp', 'nsx', 'nsz', 'xci', 'xcz']} hint="Drop files or folders to rename" />
+                    <FileList files={files} onRemove={removeFile} />
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">Rename Options</span>
+                </div>
+                <div className="options-panel">
+                    <div className="option-group">
+                        <label className="option-label">Rename Mode</label>
+                        <select value={renmode} onChange={(e) => setRenmode(e.target.value)}>
+                            <option value="force">Force</option>
+                            <option value="skip_corr_tid">Skip Correct TID</option>
+                            <option value="skip_if_tid">Skip If TID</option>
+                        </select>
+                        <span className="option-description">
+                            {renmode === 'force' ? 'Always rename files' : renmode === 'skip_corr_tid' ? 'Skip files with correct title ID in name' : 'Skip files that already contain a title ID'}
+                        </span>
+                    </div>
+                    <div className="option-group">
+                        <label className="option-label">Add Language</label>
+                        <select value={addlangue} onChange={(e) => setAddlangue(e.target.value)}>
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                        <span className="option-description">Include language information in filename</span>
+                    </div>
+                    <div className="option-group">
+                        <label className="option-label">Version Handling</label>
+                        <select value={noversion} onChange={(e) => setNoversion(e.target.value)}>
+                            <option value="false">Include version</option>
+                            <option value="true">Exclude version</option>
+                            <option value="xci_no_v0">Exclude v0 for XCI</option>
+                        </select>
+                        <span className="option-description">
+                            {noversion === 'false' ? 'Include version number in filename' : noversion === 'true' ? 'Omit version number from filename' : 'Omit v0 for XCI files only'}
+                        </span>
+                    </div>
+                    <div className="option-group">
+                        <label className="option-label">DLC Rename</label>
+                        <select value={dlcrname} onChange={(e) => setDlcrname(e.target.value)}>
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                            <option value="tag">Tag only</option>
+                        </select>
+                        <span className="option-description">
+                            {dlcrname === 'false' ? 'Do not rename DLC files' : dlcrname === 'true' ? 'Rename DLC files with full name' : 'Append DLC tag to filename'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">NUTDB Utilities</span>
+                </div>
+                <div className="options-panel">
+                    <div className="option-group">
+                        <button className="btn btn-secondary" onClick={handleNutdbRefresh} disabled={running}>
+                            Refresh NUTDB Cache
+                        </button>
+                        <span className="option-description">Update the local NUTDB title database cache</span>
+                    </div>
+                    <div className="option-group">
+                        <label className="option-label">Title ID Lookup</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                                type="text"
+                                value={nutdbTitleId}
+                                onChange={(e) => setNutdbTitleId(e.target.value)}
+                                placeholder="e.g. 0100F8F0000A2000"
+                                style={{ flex: 1 }}
+                            />
+                            <button className="btn btn-secondary" onClick={handleNutdbLookup} disabled={running || !nutdbTitleId.trim()}>
+                                Lookup
+                            </button>
+                        </div>
+                        <span className="option-description">Look up a title ID in the NUTDB database</span>
+                    </div>
+                </div>
+            </div>
+
+            {(running || outputLines.length > 0) && (
+                <ProgressDisplay progress={progress} outputLines={outputLines} />
+            )}
+
+            <ActionBar
+                running={running}
+                onCancel={handleCancel}
+                onClear={handleClear}
+                onStart={handleStart}
+                startLabel="Start Rename"
+                startDisabled={files.length === 0}
+            />
+        </div>
+    );
+}
+
 function CreatePage() {
     const { running, progress, outputLines, setRunning, setProgress, setOutputLines } = useRunnerEvents('create');
     const { outputDir, setOutputDir, selectOutputDir } = useOutputDir();
@@ -1177,6 +1343,7 @@ const PAGES: Record<string, React.FC> = {
     dspl: DsplPage,
     create: CreatePage,
     info: InfoPage,
+    rename: RenamePage,
 };
 
 async function checkSetupState() {

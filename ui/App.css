@@ -29,6 +29,7 @@
   --color-create: #58a6ff;
   --color-dspl: #e0758a;
   --color-info: #79c0ff;
+  --color-rename: #ffa657;
   --color-settings: #8b949e;
 
   /* Text colors */
@@ -275,6 +276,7 @@ body {
 .page-icon.accent-dspl { background: rgba(224, 117, 138, 0.12); color: var(--color-dspl); }
 .page-icon.accent-create { background: rgba(88, 166, 255, 0.12); color: var(--color-create); }
 .page-icon.accent-info { background: rgba(121, 192, 255, 0.12); color: var(--color-info); }
+.page-icon.accent-rename { background: rgba(255, 166, 87, 0.12); color: var(--color-rename); }
 .page-icon.accent-settings { background: rgba(139, 148, 158, 0.12); color: var(--color-settings); }
 
 .page-header h2 {

@@ -178,9 +178,22 @@ export class NscbRunner extends Emitter {
                 args.push('--create', outNsp, '--ifolder', files[0]);
                 break;
             }
+            case 'renamef':
+                args.push('--renamef', ...files);
+                if (options.renmode) args.push('--renmode', options.renmode);
+                if (options.addlangue) args.push('--addlangue', options.addlangue);
+                if (options.noversion) args.push('--noversion', options.noversion);
+                if (options.dlcrname) args.push('--dlcrname', options.dlcrname);
+                break;
+            case 'nutdb-refresh':
+                args.push('--nutdb-refresh');
+                break;
+            case 'nutdb-lookup':
+                args.push('--nutdb-lookup', options.titleId);
+                break;
         }
 
-        if (operation !== 'create' && operation !== 'info') {
+        if (operation !== 'create' && operation !== 'info' && operation !== 'renamef' && operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup') {
             if (options.output) {
                 args.push('-o', options.output);
             } else if (files.length > 0) {
@@ -190,8 +203,10 @@ export class NscbRunner extends Emitter {
 
         if (options.buffer) args.push('-b', String(options.buffer));
 
-        const keysPath = await this.resolveKeysPath();
-        if (keysPath) args.push('--keys', keysPath);
+        if (operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup') {
+            const keysPath = await this.resolveKeysPath();
+            if (keysPath) args.push('--keys', keysPath);
+        }
 
         return args;
     }

@@ -57,6 +57,9 @@ The sidecar `nscb_rust.exe` accepts these CLI patterns:
 | Convert | `-c <file> [-t xci\|nsp] [-o dir] [--keys path]` |
 | Split | `--splitter <file> [-o dir] [--keys path]` |
 | Create | `--create <out.nsp> --ifolder <dir> [--keys path]` |
+| Rename | `--renamef <path> [--renmode force\|skip_corr_tid\|skip_if_tid] [--addlangue true\|false] [--noversion false\|true\|xci_no_v0] [--dlcrname false\|true\|tag] [--keys path]` |
+| NUTDB Refresh | `--nutdb-refresh` |
+| NUTDB Lookup | `--nutdb-lookup <titleID>` |
 
 Single-file ops (compress, decompress, convert, split) accept one file per invocation — the runner batches them sequentially for multiple files.
 
