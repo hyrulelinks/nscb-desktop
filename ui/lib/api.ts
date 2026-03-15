@@ -63,9 +63,6 @@ export async function importBackend(): Promise<{ ok: boolean; error?: string }> 
     const selected = await open({
         title: 'Select nscb_rust backend binary',
         multiple: false,
-        filters: [
-            { name: 'All Files', extensions: ['*'] },
-        ],
     });
     if (!selected) return { ok: false };
 
@@ -132,9 +129,9 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
         const assets = data.assets as any[];
         let asset: any;
         if (platform === 'macos') {
-            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.includes('macos-arm64'));
+            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.dmg'));
         } else if (platform === 'linux') {
-            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.includes('linux-amd64'));
+            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.AppImage'));
         } else {
             asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.exe'));
         }

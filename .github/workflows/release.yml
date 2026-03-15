@@ -72,13 +72,14 @@ jobs:
         if: matrix.label == 'linux'
         run: |
           mkdir -p staged
-          cp src-tauri/target/release/nscb-desktop staged/nscb-desktop-linux-amd64
+          cp src-tauri/target/release/bundle/appimage/*.AppImage staged/nscb-desktop-linux-amd64.AppImage
+          cp src-tauri/target/release/bundle/deb/*.deb staged/nscb-desktop-linux-amd64.deb
 
       - name: Stage artifact (macOS)
         if: matrix.label == 'macos'
         run: |
           mkdir -p staged
-          cp src-tauri/target/release/nscb-desktop staged/nscb-desktop-macos-arm64
+          cp src-tauri/target/release/bundle/dmg/*.dmg staged/nscb-desktop-macos-arm64.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

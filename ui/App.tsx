@@ -17,8 +17,8 @@ function icon(size: number, children: React.ReactNode, strokeWidth = 2): React.J
 }
 
 const Icons = {
-    compress: icon(20, <><path d="M12 3v18" /><path d="m8 8 4-4 4 4" /><path d="m8 16 4 4 4-4" /><path d="M4 12h16" /></>),
-    decompress: icon(20, <><path d="M12 3v18" /><path d="m8 7 4 4 4-4" /><path d="m8 17 4-4 4 4" /><path d="M4 12h16" /></>),
+    compress: icon(20, <><path d="M12 3v18" /><path d="m8 7 4 4 4-4" /><path d="m8 17 4-4 4 4" /><path d="M4 12h16" /></>),
+    decompress: icon(20, <><path d="M12 3v18" /><path d="m8 8 4-4 4 4" /><path d="m8 16 4 4 4-4" /><path d="M4 12h16" /></>),
     merge: icon(20, <><circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><path d="M6 21V9a9 9 0 0 0 9 9" /><path d="M6 9a9 9 0 0 1 9-9" /></>),
     convert: icon(20, <><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></>),
     split: icon(20, <><path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" /></>),
@@ -214,10 +214,13 @@ function ExtBadge({ ext }: { ext: string }) {
 
 function DropZone({ onFiles, accept, hint }: { onFiles: (files: string[]) => void; accept?: string[]; hint?: string }) {
     const [dragOver, setDragOver] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const appWindow = getCurrentWebviewWindow();
         const unlisten = appWindow.onDragDropEvent((event) => {
+            // Only handle drop events when this DropZone is visible
+            if (!ref.current || ref.current.offsetParent === null) return;
             if (event.payload.type === 'over') {
                 setDragOver(true);
             } else if (event.payload.type === 'leave') {
@@ -241,6 +244,7 @@ function DropZone({ onFiles, accept, hint }: { onFiles: (files: string[]) => voi
 
     return (
         <div
+            ref={ref}
             className={`drop-zone ${dragOver ? 'drag-over' : ''}`}
             onClick={handleClick}
         >
@@ -669,8 +673,7 @@ const DSPL_CONFIG: OperationPageConfig = {
 function CompressPage() { return <OperationPage config={COMPRESS_CONFIG} />; }
 function DecompressPage() { return <OperationPage config={DECOMPRESS_CONFIG} />; }
 function MergePage() {
-    const { files: baseFiles, addFiles: addBaseFiles, removeFile: removeBaseFile, clearFiles: clearBaseFiles } = useFileList();
-    const { files: extraFiles, addFiles: addExtraFiles, removeFile: removeExtraFile, clearFiles: clearExtraFiles } = useFileList();
+    const { files, addFiles, removeFile, clearFiles } = useFileList();
     const { running, progress, outputLines, setRunning, setProgress, setOutputLines } = useRunnerEvents('merge');
     const { outputDir, setOutputDir, selectOutputDir } = useOutputDir();
     const [format, setFormat] = useState('xci');
@@ -679,20 +682,19 @@ function MergePage() {
     const [rsvcap, setRsvcap] = useState('');
     const [keypatch, setKeypatch] = useState('');
 
-    // Output dir defaults to base game's directory
+    // Output dir defaults to first file's directory
     useEffect(() => {
-        setOutputDir(baseFiles.length > 0 ? getDirectory(baseFiles[0]) : '');
-    }, [baseFiles]);
+        setOutputDir(files.length > 0 ? getDirectory(files[0]) : '');
+    }, [files]);
 
-    const allFiles = [...baseFiles, ...extraFiles];
-    const canStart = baseFiles.length >= 1 && extraFiles.length >= 1;
+    const canStart = files.length >= 1;
 
     const handleStart = async () => {
         if (!canStart) return;
         setRunning(true);
         setProgress({ ...EMPTY_PROGRESS, message: 'Starting merge...' });
         setOutputLines([]);
-        await runner.run('merge', allFiles, {
+        await runner.run('merge', files, {
             output: outputDir || undefined,
             format,
             nodelta: nodelta || undefined,
@@ -709,8 +711,7 @@ function MergePage() {
     };
 
     const handleClear = () => {
-        clearBaseFiles();
-        clearExtraFiles();
+        clearFiles();
         setOutputLines([]);
         setProgress(EMPTY_PROGRESS);
     };
@@ -721,31 +722,21 @@ function MergePage() {
                 <div className="page-icon accent-merge">{Icons.merge}</div>
                 <div>
                     <h2>Merge</h2>
-                    <p>Combine base game + updates + DLCs into a single file</p>
+                    <p>Merge, downgrade, or repack Switch files into a single output</p>
                 </div>
             </div>
 
             <div className="card">
                 <div className="card-header">
-                    <span className="card-title">Base Game</span>
+                    <span className="card-title">Input Files</span>
                 </div>
                 <div style={{ padding: '12px' }}>
-                    <DropZone onFiles={addBaseFiles} accept={['xci', 'nsp', 'nsz', 'xcz']} hint="Drop the base game file" />
-                    <FileList files={baseFiles} onRemove={removeBaseFile} />
+                    <DropZone onFiles={addFiles} accept={['xci', 'nsp', 'nsz', 'xcz']} hint="Drop base game, update, and DLC files" />
+                    <FileList files={files} onRemove={removeFile} />
                 </div>
             </div>
 
-            <div className="card">
-                <div className="card-header">
-                    <span className="card-title">Updates / DLCs</span>
-                </div>
-                <div style={{ padding: '12px' }}>
-                    <DropZone onFiles={addExtraFiles} accept={['xci', 'nsp', 'nsz', 'xcz']} hint="Drop update and DLC files" />
-                    <FileList files={extraFiles} onRemove={removeExtraFile} />
-                </div>
-            </div>
-
-            {allFiles.length > 0 && (
+            {files.length > 0 && (
                 <>
                     <div className="card">
                         <div className="card-header">
