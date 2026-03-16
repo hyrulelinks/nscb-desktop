@@ -129,9 +129,9 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
         const assets = data.assets as any[];
         let asset: any;
         if (platform === 'macos') {
-            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.dmg'));
+            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.includes('macos'));
         } else if (platform === 'linux') {
-            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.AppImage'));
+            asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.includes('linux'));
         } else {
             asset = assets?.find((a: any) => typeof a.name === 'string' && a.name.endsWith('.exe'));
         }
