@@ -10,7 +10,9 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "dist:portable": "tauri build && node scripts/portable.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "nscb",
@@ -26,7 +28,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.0"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

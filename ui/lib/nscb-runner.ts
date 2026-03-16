@@ -34,7 +34,92 @@ class Emitter {
     }
 }
 
-const SINGLE_FILE_OPS = new Set(['compress', 'decompress', 'convert', 'split', 'dspl', 'info']);
+export const SINGLE_FILE_OPS = new Set(['compress', 'decompress', 'convert', 'split', 'dspl', 'info', 'renamef']);
+
+export function getBasename(filePath: string): string {
+    const parts = filePath.replace(/\\/g, '/').split('/');
+    return parts[parts.length - 1];
+}
+
+export function getDirname(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/');
+    const lastSlash = normalized.lastIndexOf('/');
+    return lastSlash >= 0 ? normalized.substring(0, lastSlash) : '.';
+}
+
+export function buildArgs(operation: string, files: string[], options: Record<string, any> = {}, keysPath: string | null = null): string[] {
+    const args: string[] = [];
+
+    switch (operation) {
+        case 'compress':
+            args.push('-z', ...files);
+            if (options.level != null) args.push('--level', String(options.level));
+            break;
+        case 'decompress':
+            args.push('--decompress', ...files);
+            break;
+        case 'merge':
+            args.push('-d', ...files);
+            if (options.format) args.push('-t', options.format);
+            if (options.nodelta) args.push('-n');
+            if (options.pv) args.push('--pv');
+            if (options.rsvcap) args.push('--RSVcap', String(options.rsvcap));
+            if (options.keypatch) args.push('-k', String(options.keypatch));
+            break;
+        case 'convert':
+            args.push('-c', ...files);
+            if (options.format) args.push('-t', options.format);
+            break;
+        case 'split':
+            args.push('--splitter', ...files);
+            break;
+        case 'dspl':
+            args.push('--dspl', ...files);
+            if (options.format) args.push('-t', options.format);
+            break;
+        case 'info':
+            if (options.mode === 'filelist') {
+                args.push('--ADVfilelist', ...files);
+            } else {
+                args.push('--ADVcontentlist', ...files);
+            }
+            break;
+        case 'create': {
+            const folderName = getBasename(files[0]);
+            const outDir = options.output || getDirname(files[0]);
+            const outNsp = `${outDir}/${folderName}.nsp`;
+            args.push('--create', outNsp, '--ifolder', files[0]);
+            break;
+        }
+        case 'renamef':
+            args.push('--renamef', files[0]);
+            if (options.renmode) args.push('--renmode', options.renmode);
+            if (options.addlangue) args.push('--addlangue', options.addlangue);
+            if (options.noversion) args.push('--noversion', options.noversion);
+            if (options.dlcrname) args.push('--dlcrname', options.dlcrname);
+            break;
+        case 'nutdb-refresh':
+            args.push('--nutdb-refresh');
+            break;
+        case 'nutdb-lookup':
+            args.push('--nutdb-lookup', options.titleId);
+            break;
+    }
+
+    if (operation !== 'create' && operation !== 'info' && operation !== 'renamef' && operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup') {
+        if (options.output) {
+            args.push('-o', options.output);
+        } else if (files.length > 0) {
+            args.push('-o', getDirname(files[0]));
+        }
+    }
+
+    if (options.buffer) args.push('-b', String(options.buffer));
+
+    if (keysPath) args.push('--keys', keysPath);
+
+    return args;
+}
 
 type StdoutPayload = { op: string; line: string };
 type StderrPayload = { op: string; chunk: string };
@@ -124,91 +209,18 @@ export class NscbRunner extends Emitter {
     }
 
     private getBasename(filePath: string): string {
-        const parts = filePath.replace(/\\/g, '/').split('/');
-        return parts[parts.length - 1];
+        return getBasename(filePath);
     }
 
     private getDirname(filePath: string): string {
-        const normalized = filePath.replace(/\\/g, '/');
-        const lastSlash = normalized.lastIndexOf('/');
-        return lastSlash >= 0 ? normalized.substring(0, lastSlash) : '.';
+        return getDirname(filePath);
     }
 
     private async buildArgs(operation: string, files: string[], options: Record<string, any> = {}): Promise<string[]> {
-        const args: string[] = [];
-
-        switch (operation) {
-            case 'compress':
-                args.push('-z', ...files);
-                if (options.level != null) args.push('--level', String(options.level));
-                break;
-            case 'decompress':
-                args.push('--decompress', ...files);
-                break;
-            case 'merge':
-                args.push('-d', ...files);
-                if (options.format) args.push('-t', options.format);
-                if (options.nodelta) args.push('-n');
-                if (options.pv) args.push('--pv');
-                if (options.rsvcap) args.push('--RSVcap', String(options.rsvcap));
-                if (options.keypatch) args.push('-k', String(options.keypatch));
-                break;
-            case 'convert':
-                args.push('-c', ...files);
-                if (options.format) args.push('-t', options.format);
-                break;
-            case 'split':
-                args.push('--splitter', ...files);
-                break;
-            case 'dspl':
-                args.push('--dspl', ...files);
-                if (options.format) args.push('-t', options.format);
-                break;
-            case 'info':
-                if (options.mode === 'filelist') {
-                    args.push('--ADVfilelist', ...files);
-                } else {
-                    args.push('--ADVcontentlist', ...files);
-                }
-                break;
-            case 'create': {
-                const folderName = this.getBasename(files[0]);
-                const outDir = options.output || this.getDirname(files[0]);
-                const outNsp = `${outDir}/${folderName}.nsp`;
-                args.push('--create', outNsp, '--ifolder', files[0]);
-                break;
-            }
-            case 'renamef':
-                args.push('--renamef', ...files);
-                if (options.renmode) args.push('--renmode', options.renmode);
-                if (options.addlangue) args.push('--addlangue', options.addlangue);
-                if (options.noversion) args.push('--noversion', options.noversion);
-                if (options.dlcrname) args.push('--dlcrname', options.dlcrname);
-                break;
-            case 'nutdb-refresh':
-                args.push('--nutdb-refresh');
-                break;
-            case 'nutdb-lookup':
-                args.push('--nutdb-lookup', options.titleId);
-                break;
-        }
-
-        if (operation !== 'create' && operation !== 'info' && operation !== 'renamef' && operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup') {
-            if (options.output) {
-                args.push('-o', options.output);
-            } else if (files.length > 0) {
-                args.push('-o', this.getDirname(files[0]));
-            }
-        }
-
-        if (options.buffer) args.push('-b', String(options.buffer));
-
-        if (operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup') {
-            const keysPath = await this.resolveKeysPath();
-            if (keysPath) args.push('--keys', keysPath);
-        }
-
-        return args;
+        const keysPath = (operation !== 'nutdb-refresh' && operation !== 'nutdb-lookup')
+            ? await this.resolveKeysPath()
+            : null;
+        return buildArgs(operation, files, options, keysPath);
     }
 
     private async startBackendRun(operation: string, args: string[]): Promise<number> {

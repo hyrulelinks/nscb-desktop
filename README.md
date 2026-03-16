@@ -15,9 +15,9 @@ Built with Tauri v2 + React + Vite. Powered by [nscb_rust](https://github.com/cx
 - Rename files using embedded metadata + NUTDB lookup (with rename mode, language, version, DLC controls)
 - NUTDB utilities: refresh cache, look up title IDs
 - View file info (content details and metadata summary)
-- Drag & drop file input
+- Drag & drop files or folders (rename supports recursive folder input)
 - Live output console + progress tracking
-- Batch support for compress/decompress/convert/split
+- Batch support for compress/decompress/convert/split/rename
 - Dark theme UI with SVG iconography and file type badges
 - Auto-download nscb_rust backend from GitHub releases, or import manually
 - First-launch setup wizard for encryption keys
@@ -54,6 +54,7 @@ Requires [Rust](https://rustup.rs) + [Node.js](https://nodejs.org) (v18+).
 npm install
 npm run dev        # Tauri dev mode (hot reload)
 npm run dev:vite   # Vite dev server only (no Tauri)
+npm test           # Run unit tests
 ```
 
 ## Build
@@ -76,7 +77,8 @@ nscb-desktop/
 |  |- main.tsx             # Entry point
 |  `- lib/
 |     |- api.ts            # Tauri plugin wrappers
-|     `- nscb-runner.ts    # Backend process + progress parsing
+|     |- nscb-runner.ts    # Backend process + progress parsing
+|     `- nscb-runner.test.ts # Unit tests for CLI arg building
 |- src-tauri/              # Tauri v2 / Rust backend
 |  |- src/lib.rs           # Commands: run_nscb, import_keys, etc.
 |  |- tauri.conf.json      # Window config, bundling

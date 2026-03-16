@@ -76,6 +76,7 @@ const EXT_COLORS: Record<string, string> = {
     XCZ: '#f0883e',
     NCZ: '#f778ba',
     NCA: '#8b949e',
+    FOLDER: '#e3b341',
 };
 
 const EMPTY_PROGRESS = { percent: 0, message: '' };
@@ -214,7 +215,7 @@ function ExtBadge({ ext }: { ext: string }) {
     );
 }
 
-function DropZone({ onFiles, accept, hint }: { onFiles: (files: string[]) => void; accept?: string[]; hint?: string }) {
+function DropZone({ onFiles, accept, hint, allowFolders }: { onFiles: (files: string[]) => void; accept?: string[]; hint?: string; allowFolders?: boolean }) {
     const [dragOver, setDragOver] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -244,6 +245,12 @@ function DropZone({ onFiles, accept, hint }: { onFiles: (files: string[]) => voi
         if (files.length > 0) onFiles(files);
     }, [onFiles, accept]);
 
+    const handleBrowseFolder = useCallback(async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const folder = await api.selectOutputDir();
+        if (folder) onFiles([folder]);
+    }, [onFiles]);
+
     return (
         <div
             ref={ref}
@@ -252,7 +259,8 @@ function DropZone({ onFiles, accept, hint }: { onFiles: (files: string[]) => voi
         >
             <div className="drop-zone-icon">{Icons.upload}</div>
             <div className="drop-zone-text">
-                Drop files here or <span className="drop-zone-link">browse</span>
+                Drop {allowFolders ? 'files/folders' : 'files'} here or <span className="drop-zone-link">browse</span>
+                {allowFolders && <>{' or '}<span className="drop-zone-link" onClick={handleBrowseFolder}>browse folder</span></>}
             </div>
             <div className="drop-zone-hint">
                 {hint || 'Supports NSP, XCI, NSZ, XCZ, NCZ files'}
@@ -276,10 +284,12 @@ function FileList({ files, onRemove }: { files: string[]; onRemove: (index: numb
             <div className="file-list-header">
                 <span className="file-list-count">{files.length} file{files.length !== 1 ? 's' : ''} selected</span>
             </div>
-            {files.map((file, i) => (
+            {files.map((file, i) => {
+                const ext = getFileExt(file);
+                return (
                 <div key={i} className="file-item">
-                    <span className="file-icon">{Icons.file}</span>
-                    <ExtBadge ext={getFileExt(file)} />
+                    <span className="file-icon">{ext ? Icons.file : Icons.folder}</span>
+                    <ExtBadge ext={ext || 'FOLDER'} />
                     <div className="file-info">
                         <div className="file-name">{getFileName(file)}</div>
                         <div className="file-path">{getDirectory(file)}</div>
@@ -292,7 +302,8 @@ function FileList({ files, onRemove }: { files: string[]; onRemove: (index: numb
                         {Icons.x}
                     </button>
                 </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -948,7 +959,7 @@ function RenamePage() {
                     <span className="card-title">Input Files / Folders</span>
                 </div>
                 <div style={{ padding: '12px' }}>
-                    <DropZone onFiles={addFiles} accept={['nsp', 'nsx', 'nsz', 'xci', 'xcz']} hint="Drop files or folders to rename" />
+                    <DropZone onFiles={addFiles} accept={['nsp', 'nsx', 'nsz', 'xci', 'xcz']} hint="Drop files or folders to rename" allowFolders />
                     <FileList files={files} onRemove={removeFile} />
                 </div>
             </div>
@@ -1156,9 +1167,10 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
         setUpdateStatus(null);
         try {
             const release = await api.fetchLatestRelease();
+            const backendExists = await api.hasBackend();
             if (!release) {
                 setUpdateStatus('Could not reach GitHub. Check your network connection.');
-            } else if (backendVersion && release.tag === backendVersion) {
+            } else if (backendExists && backendVersion && release.tag === backendVersion) {
                 setUpdateStatus(`Already up to date (${backendVersion})`);
             } else {
                 setUpdateStatus(`Downloading ${release.tag}...`);

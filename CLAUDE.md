@@ -27,7 +27,8 @@ NSCB Desktop is a Tauri v2 + React + Vite desktop app for Nintendo Switch file o
 | `ui/App.tsx` | All React components and pages (config-driven) |
 | `ui/App.css` | Dark theme design system with CSS variables |
 | `ui/lib/api.ts` | Tauri plugin wrappers — dialogs, settings, keys import |
-| `ui/lib/nscb-runner.ts` | Spawns nscb_rust sidecar, parses stdout/stderr for progress |
+| `ui/lib/nscb-runner.ts` | Spawns nscb_rust sidecar, parses stdout/stderr for progress. `buildArgs` is exported for testing |
+| `ui/lib/nscb-runner.test.ts` | Vitest unit tests — validates CLI arg building for every operation |
 | `src-tauri/src/lib.rs` | Registers 4 plugins: shell, dialog, fs, opener |
 | `src-tauri/tauri.conf.json` | Window size, sidecar config, resource bundling |
 | `src-tauri/capabilities/default.json` | Security permissions for shell/dialog/fs/opener |
@@ -43,6 +44,8 @@ npm run build          # Production build (NSIS installer)
 npm run dist:portable  # Build + assemble portable folder in release/
 npm run dev:vite       # Vite dev server only (no Tauri)
 npm run build:vite     # Vite production build only
+npm run test           # Run unit tests (vitest)
+npm run test:watch     # Run tests in watch mode
 ```
 
 ## nscb_rust Operations
@@ -61,7 +64,7 @@ The sidecar `nscb_rust.exe` accepts these CLI patterns:
 | NUTDB Refresh | `--nutdb-refresh` |
 | NUTDB Lookup | `--nutdb-lookup <titleID>` |
 
-Single-file ops (compress, decompress, convert, split) accept one file per invocation — the runner batches them sequentially for multiple files.
+Single-file ops (compress, decompress, convert, split, rename) accept one file/folder per invocation — the runner batches them sequentially for multiple files. Rename also accepts a folder path for recursive renaming.
 
 ## Progress Parsing
 
@@ -73,5 +76,5 @@ Single-file ops (compress, decompress, convert, split) accept one file per invoc
 
 - Operation pages are config-driven via `OperationPage` + `OperationPageConfig`
 - Runner is a singleton (`getRunner()`) with a typed event emitter
-- The `DropZone` component handles both Tauri drag-drop events and click-to-browse via dialog
+- The `DropZone` component handles both Tauri drag-drop events and click-to-browse via dialog; supports `allowFolders` prop for folder browsing
 - Encryption keys (`prod.keys` / `keys.txt`) must exist in the tools dir — auto-resolved by the runner and passed via `--keys`
