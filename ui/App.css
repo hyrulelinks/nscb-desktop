@@ -31,6 +31,7 @@
   --color-info: #79c0ff;
   --color-rename: #ffa657;
   --color-settings: #8b949e;
+  --color-batchmerge: #56d8a4;
 
   /* Text colors */
   --text-primary: #e6edf3;
@@ -278,6 +279,7 @@ body {
 .page-icon.accent-info { background: rgba(121, 192, 255, 0.12); color: var(--color-info); }
 .page-icon.accent-rename { background: rgba(255, 166, 87, 0.12); color: var(--color-rename); }
 .page-icon.accent-settings { background: rgba(139, 148, 158, 0.12); color: var(--color-settings); }
+.page-icon.accent-batchmerge { background: rgba(86, 216, 164, 0.12); color: var(--color-batchmerge); }
 
 .page-header h2 {
   font-size: var(--font-size-2xl);
@@ -1158,6 +1160,133 @@ select {
   margin-top: var(--space-xl);
   font-size: var(--font-size-xs);
   color: var(--text-muted);
+}
+
+/* ---- Batch Merge ---- */
+.required-star {
+  color: var(--accent-danger);
+  margin-left: 2px;
+}
+
+.batch-scan-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.batch-summary {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.batch-game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.batch-game-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px var(--space-md);
+  background: var(--bg-secondary);
+  transition: background var(--transition-fast);
+}
+
+.batch-game-row:hover {
+  background: var(--bg-card-hover);
+}
+
+.batch-game-row.current {
+  background: rgba(86, 216, 164, 0.05);
+}
+
+.batch-game-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.batch-game-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-game-output {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-game-message {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.batch-game-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.batch-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 64px;
+  justify-content: center;
+}
+
+.batch-status-badge.status-pending {
+  background: rgba(139, 148, 158, 0.12);
+  color: var(--text-secondary);
+}
+
+.batch-status-badge.status-skipped {
+  background: rgba(139, 148, 158, 0.08);
+  color: var(--text-muted);
+}
+
+.batch-status-badge.status-running {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--accent-warning);
+  animation: pulse-badge 1.2s ease-in-out infinite;
+}
+
+.batch-status-badge.status-done {
+  background: rgba(63, 185, 80, 0.12);
+  color: var(--accent-success);
+}
+
+.batch-status-badge.status-error {
+  background: rgba(248, 81, 73, 0.12);
+  color: var(--accent-danger);
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 /* ---- Responsive ---- */

@@ -1,4 +1,5 @@
 import { open } from '@tauri-apps/plugin-dialog';
+import { readDir, rename as fsRename } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
@@ -169,4 +170,30 @@ export async function getSetting(key: string): Promise<string> {
 
 export async function saveSetting(key: string, value: string): Promise<void> {
     await invoke('save_setting', { key, value });
+}
+
+// ---- Filesystem helpers ----
+
+export interface DirEntryInfo {
+    name: string;
+    isDirectory: boolean;
+    path: string;
+}
+
+function joinPath(base: string, name: string): string {
+    const sep = base.includes('\\') ? '\\' : '/';
+    return base.replace(/[/\\]+$/, '') + sep + name;
+}
+
+export async function listDir(dirPath: string): Promise<DirEntryInfo[]> {
+    const entries = await readDir(dirPath);
+    return entries.map(e => ({
+        name: e.name,
+        isDirectory: e.isDirectory,
+        path: joinPath(dirPath, e.name),
+    }));
+}
+
+export async function renameFile(oldPath: string, newPath: string): Promise<void> {
+    await fsRename(oldPath, newPath);
 }

@@ -41,6 +41,7 @@
       ]
     },
     "fs:allow-read-dir",
+    "fs:allow-rename",
     "opener:allow-open-url",
     "core:window:allow-set-title"
   ]

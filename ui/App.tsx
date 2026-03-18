@@ -40,6 +40,7 @@ const Icons = {
     stop: icon(16, <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />),
     switchLogo: icon(28, <><rect x="2" y="3" width="20" height="18" rx="3" ry="3" /><line x1="12" y1="3" x2="12" y2="21" /><circle cx="7.5" cy="9" r="2" /><circle cx="16.5" cy="15" r="1.5" /></>, 1.5),
     info: icon(16, <><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></>),
+    batchMerge: icon(20, <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>),
 };
 
 // ============================================================
@@ -67,6 +68,22 @@ function getDirectory(path: string): string {
     const normalized = path.replace(/\\/g, '/');
     const lastSlash = normalized.lastIndexOf('/');
     return lastSlash >= 0 ? normalized.substring(0, lastSlash) : '';
+}
+
+function pathJoin(base: string, name: string): string {
+    const sep = base.includes('\\') ? '\\' : '/';
+    return base.replace(/[/\\]+$/, '') + sep + name;
+}
+
+const SWITCH_EXTS = new Set(['nsp', 'xci', 'nsz', 'xcz', 'ncz']);
+
+interface BatchGame {
+    name: string;
+    path: string;
+    files: string[];
+    status: 'pending' | 'skipped' | 'running' | 'done' | 'error';
+    message?: string;
+    outputFile?: string;
 }
 
 const EXT_COLORS: Record<string, string> = {
@@ -173,6 +190,7 @@ const NAV_PAGES = [
     { id: 'create', icon: Icons.create, label: 'Create/Repack' },
     { id: 'info', icon: Icons.info, label: 'Info' },
     { id: 'rename', icon: Icons.rename, label: 'Rename' },
+    { id: 'batchmerge', icon: Icons.batchMerge, label: 'Batch Merge' },
     { id: 'settings', icon: Icons.settings, label: 'Settings' },
 ];
 
@@ -1381,6 +1399,342 @@ function SetupPage({
     );
 }
 
+function BatchMergePage() {
+    const [baseFolder, setBaseFolder] = useState('');
+    const [outputDir, setOutputDir] = useState('');
+    const [format, setFormat] = useState('xci');
+    const [nodelta, setNodelta] = useState(false);
+    const [scanning, setScanning] = useState(false);
+    const [games, setGames] = useState<BatchGame[]>([]);
+    const [running, setRunning] = useState(false);
+    const [currentIdx, setCurrentIdx] = useState(-1);
+    const [outputLines, setOutputLines] = useState<string[]>([]);
+    const [progress, setProgress] = useState(EMPTY_PROGRESS);
+    const cancelledRef = useRef(false);
+    const gameResolverRef = useRef<((result: 'success' | 'error' | 'cancelled') => void) | null>(null);
+
+    useEffect(() => {
+        const unsubs = [
+            runner.on('progress', (data) => {
+                if (data.op === 'merge') setProgress({ percent: data.percent, message: data.message });
+            }),
+            runner.on('output', (data) => {
+                if (data.op === 'merge') setOutputLines(prev => [...prev.slice(-200), data.line]);
+            }),
+            runner.on('done', (data) => {
+                if (data.op === 'merge' && gameResolverRef.current) {
+                    const resolve = gameResolverRef.current;
+                    gameResolverRef.current = null;
+                    resolve(data.code === 0 ? 'success' : 'error');
+                }
+            }),
+            runner.on('nscb-error', (data) => {
+                if (data.op === 'merge') setOutputLines(prev => [...prev, `ERROR: ${data.message}`]);
+            }),
+        ];
+        return () => unsubs.forEach(fn => fn());
+    }, []);
+
+    const handleSelectBaseFolder = async () => {
+        const dir = await api.selectOutputDir();
+        if (dir) { setBaseFolder(dir); setGames([]); }
+    };
+
+    const handleSelectOutputDir = async () => {
+        const dir = await api.selectOutputDir();
+        if (dir) setOutputDir(dir);
+    };
+
+    function normalizeForMatch(s: string): string {
+        return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    const handleScan = async () => {
+        if (!baseFolder || !outputDir) return;
+        setScanning(true);
+        setGames([]);
+        try {
+            const entries = await api.listDir(baseFolder);
+            const subfolders = entries.filter(e => e.isDirectory);
+
+            let outputFiles: api.DirEntryInfo[] = [];
+            try { outputFiles = await api.listDir(outputDir); } catch { /* empty output dir */ }
+
+            const discovered: BatchGame[] = [];
+            for (const sub of subfolders) {
+                if (!sub.name) continue;
+                let subEntries: api.DirEntryInfo[] = [];
+                try { subEntries = await api.listDir(sub.path); } catch { continue; }
+
+                const switchFiles = subEntries.filter(e => {
+                    if (e.isDirectory) return false;
+                    const ext = e.name.split('.').pop()?.toLowerCase() ?? '';
+                    return SWITCH_EXTS.has(ext);
+                });
+                if (switchFiles.length === 0) continue;
+
+                const normName = normalizeForMatch(sub.name);
+                const alreadyExists = normName.length >= 3 && outputFiles.some(f => {
+                    if (f.isDirectory) return false;
+                    const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+                    if (!SWITCH_EXTS.has(ext)) return false;
+                    const base = f.name.substring(0, f.name.lastIndexOf('.'));
+                    return normalizeForMatch(base).includes(normName);
+                });
+
+                discovered.push({
+                    name: sub.name,
+                    path: sub.path,
+                    files: switchFiles.map(f => f.path),
+                    status: alreadyExists ? 'skipped' : 'pending',
+                    message: alreadyExists ? 'Output already found in output folder' : undefined,
+                });
+            }
+            setGames(discovered);
+        } catch (e: any) {
+            setGames([]);
+        } finally {
+            setScanning(false);
+        }
+    };
+
+    const listOutputFileNames = async (): Promise<Set<string>> => {
+        try {
+            const entries = await api.listDir(outputDir);
+            return new Set(entries.filter(e => !e.isDirectory).map(e => e.name));
+        } catch { return new Set(); }
+    };
+
+    const runCurrentGame = (files: string[], opts: Record<string, any>): Promise<'success' | 'error' | 'cancelled'> => {
+        return new Promise((resolve) => {
+            gameResolverRef.current = resolve;
+            runner.run('merge', files, opts).catch(() => {
+                if (gameResolverRef.current === resolve) {
+                    gameResolverRef.current = null;
+                    resolve('error');
+                }
+            });
+        });
+    };
+
+    const handleStart = async () => {
+        const pendingCount = games.filter(g => g.status === 'pending').length;
+        if (!outputDir || pendingCount === 0 || running) return;
+
+        setRunning(true);
+        cancelledRef.current = false;
+
+        for (let i = 0; i < games.length; i++) {
+            if (cancelledRef.current) break;
+            const game = games[i];
+            if (game.status !== 'pending') continue;
+
+            setCurrentIdx(i);
+            setOutputLines([]);
+            setProgress({ ...EMPTY_PROGRESS, message: `Merging: ${game.name}` });
+            setGames(prev => prev.map((g, idx) => idx === i ? { ...g, status: 'running', message: undefined } : g));
+
+            const beforeFiles = await listOutputFileNames();
+            const result = await runCurrentGame(game.files, {
+                output: outputDir,
+                format,
+                nodelta: nodelta || undefined,
+            });
+
+            if (result === 'cancelled') {
+                setGames(prev => prev.map((g, idx) => idx === i ? { ...g, status: 'pending', message: 'Cancelled' } : g));
+                break;
+            }
+
+            const afterEntries = await api.listDir(outputDir).catch(() => [] as api.DirEntryInfo[]);
+            const newFiles = afterEntries.filter(e => !e.isDirectory && !beforeFiles.has(e.name));
+
+            if (result === 'error') {
+                let renamedFile: string | undefined;
+                for (const f of newFiles) {
+                    if (!f.name.startsWith('ERROR_')) {
+                        const newName = `ERROR_${f.name}`;
+                        try {
+                            await api.renameFile(f.path, pathJoin(outputDir, newName));
+                            renamedFile = newName;
+                        } catch {
+                            renamedFile = f.name;
+                        }
+                    }
+                }
+                setGames(prev => prev.map((g, idx) => idx === i
+                    ? { ...g, status: 'error', outputFile: renamedFile, message: 'Merge failed' }
+                    : g));
+            } else {
+                setGames(prev => prev.map((g, idx) => idx === i
+                    ? { ...g, status: 'done', outputFile: newFiles[0]?.name }
+                    : g));
+            }
+        }
+
+        setRunning(false);
+        setCurrentIdx(-1);
+        if (!cancelledRef.current) {
+            setProgress({ percent: 100, message: 'Batch merge complete!' });
+        }
+    };
+
+    const handleCancel = async () => {
+        cancelledRef.current = true;
+        if (gameResolverRef.current) {
+            const resolve = gameResolverRef.current;
+            gameResolverRef.current = null;
+            resolve('cancelled');
+        }
+        await runner.cancel();
+        setRunning(false);
+        setProgress({ ...EMPTY_PROGRESS, message: 'Cancelled' });
+    };
+
+    const handleClear = () => {
+        if (running) return;
+        setGames([]);
+        setOutputLines([]);
+        setProgress(EMPTY_PROGRESS);
+    };
+
+    const pendingCount = games.filter(g => g.status === 'pending').length;
+    const skippedCount = games.filter(g => g.status === 'skipped').length;
+    const doneCount = games.filter(g => g.status === 'done').length;
+    const errorCount = games.filter(g => g.status === 'error').length;
+
+    return (
+        <div className="page">
+            <div className="page-header">
+                <div className="page-icon accent-batchmerge">{Icons.batchMerge}</div>
+                <div>
+                    <h2>Batch Merge</h2>
+                    <p>Auto-merge all games in a folder, skipping already-merged titles</p>
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">Folders</span>
+                </div>
+                <div className="options-panel">
+                    <div className="option-group">
+                        <label className="option-label">Base Folder</label>
+                        <div className="dir-picker-row">
+                            <input
+                                type="text"
+                                value={baseFolder}
+                                onChange={e => setBaseFolder(e.target.value)}
+                                placeholder="Folder containing game subfolders..."
+                                readOnly={running}
+                            />
+                            <button className="btn btn-secondary btn-sm" onClick={handleSelectBaseFolder} disabled={running}>Browse</button>
+                        </div>
+                        <span className="option-description">Each subfolder is treated as one game (base + updates + DLC)</span>
+                    </div>
+                    <div className="option-group">
+                        <label className="option-label">
+                            Output Folder <span className="required-star">*</span>
+                        </label>
+                        <div className="dir-picker-row">
+                            <input
+                                type="text"
+                                value={outputDir}
+                                onChange={e => setOutputDir(e.target.value)}
+                                placeholder="Required — all merged outputs go here"
+                                readOnly={running}
+                            />
+                            <button className="btn btn-secondary btn-sm" onClick={handleSelectOutputDir} disabled={running}>Browse</button>
+                        </div>
+                        <span className="option-description">Merged files are saved here. Existing outputs are checked to skip already-merged games.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-title">Merge Options</span>
+                </div>
+                <div className="options-panel">
+                    <div className="option-group">
+                        <label className="option-label">Output Format</label>
+                        <select value={format} onChange={e => setFormat(e.target.value)} disabled={running}>
+                            <option value="xci">XCI (Game Cartridge)</option>
+                            <option value="nsp">NSP (eShop Package)</option>
+                        </select>
+                    </div>
+                    <div className="option-group">
+                        <Toggle checked={nodelta} onChange={setNodelta} label="Exclude Delta Fragments" />
+                        <span className="option-description">Skip delta NCA fragments during merge</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="batch-scan-row">
+                <button
+                    className="btn btn-secondary"
+                    onClick={handleScan}
+                    disabled={!baseFolder || !outputDir || scanning || running}
+                >
+                    {scanning ? 'Scanning...' : 'Scan Folder'}
+                </button>
+                {games.length > 0 && (
+                    <span className="batch-summary">
+                        {games.length} game{games.length !== 1 ? 's' : ''} found
+                        {' · '}{pendingCount} to merge
+                        {skippedCount > 0 && ` · ${skippedCount} already merged`}
+                        {doneCount > 0 && ` · ${doneCount} done`}
+                        {errorCount > 0 && ` · ${errorCount} failed`}
+                    </span>
+                )}
+            </div>
+
+            {games.length > 0 && (
+                <div className="card">
+                    <div className="card-header">
+                        <span className="card-title">Discovered Games</span>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{games.length} found</span>
+                    </div>
+                    <div className="batch-game-list">
+                        {games.map((game, i) => (
+                            <div key={game.path} className={`batch-game-row status-${game.status}${i === currentIdx ? ' current' : ''}`}>
+                                <span className={`batch-status-badge status-${game.status}`}>
+                                    {game.status === 'pending' ? 'Pending'
+                                        : game.status === 'skipped' ? 'Skipped'
+                                        : game.status === 'running' ? 'Running…'
+                                        : game.status === 'done' ? 'Done'
+                                        : 'Error'}
+                                </span>
+                                <div className="batch-game-info">
+                                    <span className="batch-game-name">{game.name}</span>
+                                    {game.outputFile && <span className="batch-game-output">{game.outputFile}</span>}
+                                    {game.message && !game.outputFile && <span className="batch-game-message">{game.message}</span>}
+                                </div>
+                                <span className="batch-game-count">{game.files.length} file{game.files.length !== 1 ? 's' : ''}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {(running || outputLines.length > 0) && (
+                <ProgressDisplay progress={progress} outputLines={outputLines} />
+            )}
+
+            {games.length > 0 && (
+                <ActionBar
+                    running={running}
+                    onCancel={handleCancel}
+                    onClear={handleClear}
+                    onStart={handleStart}
+                    startLabel={`Start Batch Merge (${pendingCount})`}
+                    startDisabled={!outputDir || pendingCount === 0}
+                />
+            )}
+        </div>
+    );
+}
+
 function MissingBackendBanner({ onGoToSettings }: { onGoToSettings: () => void }) {
     return (
         <div className="missing-backend-banner">
@@ -1407,6 +1761,7 @@ const PAGES: Record<string, React.FC> = {
     create: CreatePage,
     info: InfoPage,
     rename: RenamePage,
+    batchmerge: BatchMergePage,
 };
 
 async function checkSetupState() {
