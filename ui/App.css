@@ -1198,6 +1198,10 @@ select {
   transition: background var(--transition-fast);
 }
 
+.batch-game-row.toggleable {
+  cursor: pointer;
+}
+
 .batch-game-row:hover {
   background: var(--bg-card-hover);
 }

@@ -1591,6 +1591,16 @@ function BatchMergePage() {
         setProgress({ ...EMPTY_PROGRESS, message: 'Cancelled' });
     };
 
+    const handleToggleGame = (idx: number) => {
+        if (running) return;
+        setGames(prev => prev.map((g, i) => {
+            if (i !== idx) return g;
+            if (g.status === 'pending') return { ...g, status: 'skipped', message: 'Manually skipped' };
+            if (g.status === 'skipped') return { ...g, status: 'pending', message: undefined };
+            return g;
+        }));
+    };
+
     const handleClear = () => {
         if (running) return;
         setGames([]);
@@ -1696,8 +1706,15 @@ function BatchMergePage() {
                         <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{games.length} found</span>
                     </div>
                     <div className="batch-game-list">
-                        {games.map((game, i) => (
-                            <div key={game.path} className={`batch-game-row status-${game.status}${i === currentIdx ? ' current' : ''}`}>
+                        {games.map((game, i) => {
+                            const toggleable = !running && (game.status === 'pending' || game.status === 'skipped');
+                            return (
+                            <div
+                                key={game.path}
+                                className={`batch-game-row status-${game.status}${i === currentIdx ? ' current' : ''}${toggleable ? ' toggleable' : ''}`}
+                                onClick={toggleable ? () => handleToggleGame(i) : undefined}
+                                title={toggleable ? (game.status === 'pending' ? 'Click to skip' : 'Click to include') : undefined}
+                            >
                                 <span className={`batch-status-badge status-${game.status}`}>
                                     {game.status === 'pending' ? 'Pending'
                                         : game.status === 'skipped' ? 'Skipped'
@@ -1712,7 +1729,8 @@ function BatchMergePage() {
                                 </div>
                                 <span className="batch-game-count">{game.files.length} file{game.files.length !== 1 ? 's' : ''}</span>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
