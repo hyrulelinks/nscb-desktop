@@ -9,7 +9,7 @@ export default defineConfig({
   clearScreen: false,
   server: {
     host: host || false,
-    port: 5173,
+    port: 5183,
     strictPort: true,
     hmr: host ? { protocol: 'ws', host, port: 5174 } : undefined,
     watch: {

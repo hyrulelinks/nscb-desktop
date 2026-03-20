@@ -334,6 +334,19 @@ describe('nutdb-refresh', () => {
         expect(args).toContain('--keys');
         // This is fine: the runner ensures keysPath=null for nutdb ops.
     });
+
+    it('appends --nutdb-url when nutdbUrl option is set', () => {
+        const url = 'https://gh-proxy.org/https://raw.githubusercontent.com/blawar/titledb/master/US.en.json';
+        expect(buildArgs('nutdb-refresh', [], { nutdbUrl: url }, null)).toEqual([
+            '--nutdb-refresh', '--nutdb-url', url,
+        ]);
+    });
+
+    it('omits --nutdb-url when nutdbUrl option is empty', () => {
+        expect(buildArgs('nutdb-refresh', [], { nutdbUrl: '' }, null)).toEqual([
+            '--nutdb-refresh',
+        ]);
+    });
 });
 
 describe('nutdb-lookup', () => {

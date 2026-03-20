@@ -903,6 +903,13 @@ function RenamePage() {
     const [noversion, setNoversion] = useState('false');
     const [dlcrname, setDlcrname] = useState('false');
     const [nutdbTitleId, setNutdbTitleId] = useState('');
+    const [proxy, setProxy] = useState('');
+    const [nutdbUrl, setNutdbUrl] = useState('');
+
+    useEffect(() => {
+        api.getSetting('proxy').then(setProxy);
+        api.getSetting('nutdbUrl').then(setNutdbUrl);
+    }, []);
 
     const handleStart = async () => {
         if (files.length === 0) return;
@@ -921,7 +928,9 @@ function RenamePage() {
         setRunning(true);
         setProgress({ ...EMPTY_PROGRESS, message: 'Refreshing NUTDB cache...' });
         setOutputLines([]);
-        await runner.run('nutdb-refresh', [], {});
+        const baseUrl = nutdbUrl || 'https://raw.githubusercontent.com/blawar/titledb/master/US.en.json';
+        const finalUrl = proxy ? proxy + baseUrl : baseUrl;
+        await runner.run('nutdb-refresh', [], { nutdbUrl: finalUrl });
     };
 
     const handleNutdbLookup = async () => {
@@ -1156,10 +1165,14 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
     const [keysInstalled, setKeysInstalled] = useState(false);
     const [updateStatus, setUpdateStatus] = useState<string | null>(null);
     const [checkingUpdate, setCheckingUpdate] = useState(false);
+    const [proxy, setProxy] = useState('');
+    const [nutdbUrl, setNutdbUrl] = useState('');
 
     useEffect(() => {
         api.getInstalledVersion().then(setBackendVersion);
         api.hasKeys().then(setKeysInstalled);
+        api.getSetting('proxy').then(setProxy);
+        api.getSetting('nutdbUrl').then(setNutdbUrl);
     }, []);
 
     const handleCheckUpdate = async () => {
@@ -1251,6 +1264,44 @@ function SettingsPage({ onBackendChanged }: { onBackendChanged?: () => void }) {
                             <button className="btn btn-secondary btn-sm" onClick={handleImportKeys}>
                                 {Icons.key} Import Keys
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="settings-section">
+                    <h3 className="settings-section-title">Network</h3>
+
+                    <div className="settings-row">
+                        <div className="settings-row-label">
+                            <h4>Proxy Prefix</h4>
+                            <p>URL prefix for proxying GitHub downloads (e.g. https://gh-proxy.org/)</p>
+                        </div>
+                        <div className="settings-row-control">
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="https://gh-proxy.org/"
+                                value={proxy}
+                                onChange={(e) => setProxy(e.target.value)}
+                                onBlur={() => api.saveSetting('proxy', proxy.trim())}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="settings-row">
+                        <div className="settings-row-label">
+                            <h4>NUTDB Source URL</h4>
+                            <p>Override the default NUTDB title database URL</p>
+                        </div>
+                        <div className="settings-row-control">
+                            <input
+                                type="text"
+                                className="input"
+                                placeholder="https://raw.githubusercontent.com/blawar/titledb/master/US.en.json"
+                                value={nutdbUrl}
+                                onChange={(e) => setNutdbUrl(e.target.value)}
+                                onBlur={() => api.saveSetting('nutdbUrl', nutdbUrl.trim())}
+                            />
                         </div>
                     </div>
                 </div>

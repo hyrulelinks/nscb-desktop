@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -250,22 +251,31 @@ fn run_nscb(app: tauri::AppHandle, operation: String, args: Vec<String>) -> Resu
 
 #[tauri::command]
 fn get_backend_version(app: tauri::AppHandle) -> Result<String, String> {
+    let settings = read_settings(&app)?;
+    if let Some(v) = settings.get("backendVersion") {
+        return Ok(v.clone());
+    }
+    // migrate from legacy version.txt
     let tools_dir = app_tools_dir(&app)?;
     let version_file = tools_dir.join("version.txt");
     if version_file.exists() {
-        std::fs::read_to_string(&version_file)
+        let v = std::fs::read_to_string(&version_file)
             .map(|s| s.trim().to_string())
-            .map_err(|e| format!("Failed to read version: {e}"))
-    } else {
-        Ok(String::new())
+            .map_err(|e| format!("Failed to read version: {e}"))?;
+        if !v.is_empty() {
+            let mut settings = settings;
+            settings.insert("backendVersion".to_string(), v.clone());
+            write_settings(&app, &settings)?;
+        }
+        let _ = std::fs::remove_file(&version_file);
+        return Ok(v);
     }
+    Ok(String::new())
 }
 
 #[tauri::command]
 fn save_backend_version(app: tauri::AppHandle, version: String) -> Result<(), String> {
-    let tools_dir = app_tools_dir(&app)?;
-    std::fs::write(tools_dir.join("version.txt"), version.as_bytes())
-        .map_err(|e| format!("Failed to save version: {e}"))
+    save_setting(app, "backendVersion".to_string(), version)
 }
 
 #[tauri::command]
@@ -331,6 +341,47 @@ fn cancel_nscb() -> Result<(), String> {
     Ok(())
 }
 
+fn settings_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let tools_dir = app_tools_dir(app)?;
+    Ok(tools_dir.join("settings.json"))
+}
+
+fn read_settings(app: &tauri::AppHandle) -> Result<HashMap<String, String>, String> {
+    let path = settings_path(app)?;
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let data = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read settings: {e}"))?;
+    serde_json::from_str(&data)
+        .map_err(|e| format!("Failed to parse settings: {e}"))
+}
+
+fn write_settings(app: &tauri::AppHandle, settings: &HashMap<String, String>) -> Result<(), String> {
+    let path = settings_path(app)?;
+    let data = serde_json::to_string_pretty(settings)
+        .map_err(|e| format!("Failed to serialize settings: {e}"))?;
+    std::fs::write(&path, data.as_bytes())
+        .map_err(|e| format!("Failed to write settings: {e}"))
+}
+
+#[tauri::command]
+fn get_setting(app: tauri::AppHandle, key: String) -> Result<String, String> {
+    let settings = read_settings(&app)?;
+    Ok(settings.get(&key).cloned().unwrap_or_default())
+}
+
+#[tauri::command]
+fn save_setting(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    let mut settings = read_settings(&app)?;
+    if value.is_empty() {
+        settings.remove(&key);
+    } else {
+        settings.insert(key, value);
+    }
+    write_settings(&app, &settings)
+}
+
 #[tauri::command]
 fn get_platform() -> String {
     std::env::consts::OS.to_string()
@@ -353,7 +404,9 @@ pub fn run() {
             download_backend,
             run_nscb,
             cancel_nscb,
-            get_platform
+            get_platform,
+            get_setting,
+            save_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

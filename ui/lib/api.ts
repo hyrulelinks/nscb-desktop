@@ -158,3 +158,15 @@ export async function getInstalledVersion(): Promise<string | null> {
 export async function saveInstalledVersion(tag: string): Promise<void> {
     await invoke('save_backend_version', { version: tag });
 }
+
+export async function getSetting(key: string): Promise<string> {
+    try {
+        return await invoke<string>('get_setting', { key });
+    } catch {
+        return '';
+    }
+}
+
+export async function saveSetting(key: string, value: string): Promise<void> {
+    await invoke('save_setting', { key, value });
+}

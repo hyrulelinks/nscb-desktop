@@ -20,6 +20,8 @@ Built with Tauri v2 + React + Vite. Powered by [nscb_rust](https://github.com/cx
 - Batch support for compress/decompress/convert/split/rename
 - Dark theme UI with SVG iconography and file type badges
 - Auto-download nscb_rust backend from GitHub releases, or import manually
+- Proxy support for NUTDB downloads (URL prefix proxy for users behind firewalls)
+- Configurable NUTDB source URL override
 - First-launch setup wizard for encryption keys
 - Cross-platform: Windows x86_64, Linux x86_64, macOS ARM64
 

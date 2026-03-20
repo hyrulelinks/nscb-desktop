@@ -100,6 +100,7 @@ export function buildArgs(operation: string, files: string[], options: Record<st
             break;
         case 'nutdb-refresh':
             args.push('--nutdb-refresh');
+            if (options.nutdbUrl) args.push('--nutdb-url', options.nutdbUrl);
             break;
         case 'nutdb-lookup':
             args.push('--nutdb-lookup', options.titleId);
