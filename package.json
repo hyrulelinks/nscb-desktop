@@ -1,6 +1,6 @@
 {
   "name": "nscb-desktop",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "description": "Modern desktop app for Nintendo Switch file operations",
   "private": true,
   "type": "module",

@@ -9,6 +9,7 @@ Built with Tauri v2 + React + Vite. Powered by [nscb_rust](https://github.com/cx
 - Compress NSP/XCI to NSZ/XCZ (zstd level 1-22)
 - Decompress NSZ/XCZ/NCZ back to NSP/XCI
 - Merge, downgrade, or repack into one NSP/XCI (with firmware controls: RSV cap, key generation patch)
+- Batch Merge: select a folder containing game subfolders (base + updates + DLC) and merge them all in one go, with skip/process controls per game
 - Convert between NSP and XCI
 - Split multi-title files into per-title folders or individual NSP/XCI files
 - Create/Repack NSP from split folders
